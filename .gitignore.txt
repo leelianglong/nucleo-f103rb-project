@@ -1,0 +1,40 @@
+# ===== 编译输出目录 =====
+build/
+Debug/
+Release/
+cmake-build-*/
+
+# ===== 编译中间文件 =====
+*.o
+*.obj
+*.d
+*.a
+*.elf
+*.bin
+*.hex
+*.map
+*.lst
+*.su
+
+# ===== CMake 自动生成文件 =====
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+!CMakePresets.json
+
+# ===== VS Code 可选忽略（若想共享配置可保留 .vscode）=====
+# .vscode/
+# 但建议保留 .vscode 下的 settings.json、tasks.json、launch.json
+# 如果 c_cpp_properties.json 含绝对路径，可单独忽略：
+.vscode/c_cpp_properties.json
+.vscode/ipch/
+
+# ===== 其他 =====
+*.log
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db
