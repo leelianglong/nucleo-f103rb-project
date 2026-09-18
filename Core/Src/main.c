@@ -77,6 +77,16 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
         printf("Button pressed!\r\n");
     }
 }
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+    if (htim->Instance == TIM1)
+    {
+        // 当 TIM1 计数到达自动重装载值时，切换 LED 灯的状态
+        HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+        printf("Timer1 interrupt coming !\r\n");
+    }
+}
 /* USER CODE END 0 */
 
 /**
@@ -110,15 +120,16 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_TIM1_Init();
-
   /* USER CODE BEGIN 2 */
-  HAL_TIM_Base_Start(&htim1);
+  //HAL_TIM_Base_Start(&htim1);
+  HAL_TIM_Base_Start_IT(&htim1); // 启动 TIM1 并使能中断
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    #if 0
     if (__HAL_TIM_GET_FLAG(&htim1, TIM_FLAG_UPDATE) != RESET)
     {
         // 清除更新中断标志
@@ -127,6 +138,7 @@ int main(void)
         HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
         printf("Timer1 reach !\r\n");
     }
+    #endif
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

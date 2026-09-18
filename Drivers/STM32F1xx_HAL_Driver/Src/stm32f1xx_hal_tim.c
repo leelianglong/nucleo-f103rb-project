@@ -298,6 +298,7 @@ HAL_StatusTypeDef HAL_TIM_Base_Init(TIM_HandleTypeDef *htim)
     HAL_TIM_Base_MspInit(htim);
 #endif /* USE_HAL_TIM_REGISTER_CALLBACKS */
   }
+
   /* Set the TIM state */
   htim->State = HAL_TIM_STATE_BUSY;
 
