@@ -1,21 +1,23 @@
 /* USER CODE BEGIN Header */
+#include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 /**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2026 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : main.c
+ * @brief          : Main program body
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2026 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -24,6 +26,7 @@
 /* USER CODE BEGIN Includes */
 #include "dth11.h"
 #include "ssd1306.h"
+#include "esp01s.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -47,6 +50,7 @@ I2C_HandleTypeDef hi2c1;
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 
+UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
@@ -60,6 +64,7 @@ static void MX_USART2_UART_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -69,41 +74,40 @@ static void MX_I2C1_Init(void);
 /* 重定向 __io_putchar，让 printf 使用 USART2 输出 */
 int __io_putchar(int ch)
 {
-    // 注意这里的超时时间，如果用 HAL_MAX_DELAY，如果串口没打开可能导致死锁
-    HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, 100);
-    return ch;
+  // 注意这里的超时时间，如果用 HAL_MAX_DELAY，如果串口没打开可能导致死锁
+  HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, 100);
+  return ch;
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-    if (GPIO_Pin == GPIO_PIN_13)
-    {
-        // 当 PC13 产生中断时，切换 LED 灯的状态
-        HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-        printf("Button pressed!\r\n");
-    }
+  if (GPIO_Pin == GPIO_PIN_13)
+  {
+    // 当 PC13 产生中断时，切换 LED 灯的状态
+    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+    printf("Button pressed!\r\n");
+  }
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-    if (htim->Instance == TIM1)
-    {
-        // 当 TIM1 计数到达自动重装载值时，切换 LED 灯的状态
-        HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-        printf("Timer1 interrupt coming !\r\n");
-    }
+  if (htim->Instance == TIM1)
+  {
+    // 当 TIM1 计数到达自动重装载值时，切换 LED 灯的状态
+    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+    // printf("Timer1 interrupt coming !\r\n");
+  }
 }
 /* USER CODE END 0 */
 
 /**
-  * @brief  The application entry point.
-  * @retval int
-  */
+ * @brief  The application entry point.
+ * @retval int
+ */
 int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -128,8 +132,9 @@ int main(void)
   MX_TIM1_Init();
   MX_TIM2_Init();
   MX_I2C1_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  //HAL_TIM_Base_Start(&htim1);
+  // HAL_TIM_Base_Start(&htim1);
   HAL_TIM_Base_Start_IT(&htim1); // 启动 TIM1 并使能中断
   HAL_TIM_Base_Start(&htim2);
   /* USER CODE END 2 */
@@ -140,8 +145,8 @@ int main(void)
   // dth11 传感器读取的温度和湿度变量
   uint8_t temperature = 0, humidity = 0;
 
-  // SSD1306 OLED 显示屏
-  #if 0
+// SSD1306 OLED 显示屏
+#if 0
   // 对I2C总线进行扫描，查找连接的设备
   uint8_t i2c_address = I2C_Scan();
   if (i2c_address != 0xFF)
@@ -152,7 +157,7 @@ int main(void)
   {
       printf("No I2C device found.\r\n");
   }
-  #endif
+ 
   SSD1306_Init();
   SSD1306_Clear();
   SSD1306_ShowString(0,0,"NUCLEO-F103RB");
@@ -160,9 +165,11 @@ int main(void)
   SSD1306_ShowString(0,32,"I2C Hardware");
   SSD1306_ShowString(0,48,"Hello World!");
   SSD1306_Refresh();
+#endif
+  ESP01S_Init();
   while (1)
   {
-    #if 0
+#if 0
     if (__HAL_TIM_GET_FLAG(&htim1, TIM_FLAG_UPDATE) != RESET)
     {
         // 清除更新中断标志
@@ -171,18 +178,115 @@ int main(void)
         HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
         printf("Timer1 reach !\r\n");
     }
-    #endif
+#endif
 
-      if (DHT11_Read_Data(&temperature, &humidity) == 0)
+    if (DHT11_Read_Data(&temperature, &humidity) == 0)
+    {
+      printf("Temperature: %d C, Humidity: %d %%\r\n", temperature, humidity);
+    }
+    else
+    {
+      printf("DHT11 Read Error!\r\n");
+    }
+    // DHT11读取间隔建议大于1秒
+    // HAL_Delay(2000);
+    /* ---- ESP-01S 一次性自检：握手 → 联网 → TCP ---- */
+    static uint8_t esp_selftest_done = 0;
+    if (!esp_selftest_done)
+    {
+      esp_selftest_done = 1;
+
+      uint8_t at_ok = 0;
+      for (uint8_t i = 0; i < 5; i++)
       {
-          printf("Temperature: %d C, Humidity: %d %%\r\n", temperature, humidity);
+        if (ESP01S_SendAT(1000) == 0)
+        {
+          at_ok = 1;
+          break;
+        }
+        printf("AT retry %u/5\r\n", i + 1);
+      }
+
+      if (!at_ok)
+      {
+        printf("ESP-01S AT FAILED, last=[%s]\r\n", ESP01S_GetLastResponse());
       }
       else
       {
-          printf("DHT11 Read Error!\r\n");
+        printf("ESP-01S AT OK\r\n");
+
+        /* 原始扫描：能看到每个 AP 的加密方式和 RSSI */
+        printf("--- AT+CWLAP ---\r\n");
+        if (ESP01S_SendATCommand("AT+CWLAP", "OK", 15000))
+        {
+          printf("%s\r\n", ESP01S_GetLastResponse());
+        }
+        else
+        {
+          printf("scan failed, resp=[%s]\r\n", ESP01S_GetLastResponse());
+        }
+
+        /* 目标 SSID 是否出现在本次扫描结果里 */
+        uint8_t target_seen = (strstr(ESP01S_GetLastResponse(), "\"CMCC-vEGS\"") != NULL);
+        printf("target CMCC-vEGS in scan: %s\r\n", target_seen ? "YES" : "NO");
+
+        /* 失败后先 CWQAP 清状态，再重试，最多 3 次 */
+        uint8_t wifi_ok = 0;
+        for (uint8_t attempt = 0; attempt < 3 && !wifi_ok; attempt++)
+        {
+          printf("CWJAP attempt %u ...\r\n", attempt + 1);
+          wifi_ok = ESP01S_ConnectWiFi("CMCC-vEGS", "64Q23a2d");
+          if (!wifi_ok)
+          {
+            printf("  failed, resp=[%s]\r\n", ESP01S_GetLastResponse());
+            ESP01S_SendATCommand("AT+CWQAP", "OK", 2000);
+            HAL_Delay(1000);
+          }
+        }
+
+        if (wifi_ok)
+        {
+          printf("WiFi Connected!\r\n");
+          if (ESP01S_SendATCommand("AT+CIFSR", "OK", 3000))
+          {
+            printf("IP info: %s\r\n", ESP01S_GetLastResponse());
+          }
+          printf("Switching ESP to TCP server on port 8080 ...\r\n");
+          if (ESP01S_SendATCommand("AT+CIPMUX=1", "OK", 2000) &&
+              ESP01S_SendATCommand("AT+CIPSERVER=1,8080", "OK", 2000))
+          {
+            printf("ESP listening, waiting for client (30s)...\r\n");
+            if (ESP01S_WaitForResponse("CONNECT", 30000))
+            {
+              const char *payload = "Hello from STM32!";
+              char sendcmd[32];
+              printf("Client connected, sending...\r\n");
+              snprintf(sendcmd, sizeof(sendcmd), "AT+CIPSEND=0,%u", (unsigned)strlen(payload));
+              if (ESP01S_SendATCommand(sendcmd, ">", 2000))
+              {
+                HAL_UART_Transmit(&huart1, (uint8_t *)payload, strlen(payload), 1000);
+                if (ESP01S_WaitForResponse("SEND OK", 5000))
+                  printf("DATA SENT OK\r\n");
+                else
+                  printf("send failed, resp=[%s]\r\n", ESP01S_GetLastResponse());
+              }
+              else
+              {
+                printf("CIPSEND failed, resp=[%s]\r\n", ESP01S_GetLastResponse());
+              }
+            }
+            else
+            {
+              printf("no client connected\r\n");
+            }
+          }
+          else
+          {
+            printf("CIPSERVER failed, resp=[%s]\r\n", ESP01S_GetLastResponse());
+          }
+        }
       }
-      // DHT11读取间隔建议大于1秒
-      HAL_Delay(2000); 
+    }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -191,17 +295,17 @@ int main(void)
 }
 
 /**
-  * @brief System Clock Configuration
-  * @retval None
-  */
+ * @brief System Clock Configuration
+ * @retval None
+ */
 void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
   /** Initializes the RCC Oscillators according to the specified parameters
-  * in the RCC_OscInitTypeDef structure.
-  */
+   * in the RCC_OscInitTypeDef structure.
+   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
@@ -212,9 +316,8 @@ void SystemClock_Config(void)
   }
 
   /** Initializes the CPU, AHB and APB buses clocks
-  */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+   */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
@@ -227,10 +330,10 @@ void SystemClock_Config(void)
 }
 
 /**
-  * @brief I2C1 Initialization Function
-  * @param None
-  * @retval None
-  */
+ * @brief I2C1 Initialization Function
+ * @param None
+ * @retval None
+ */
 static void MX_I2C1_Init(void)
 {
 
@@ -257,14 +360,13 @@ static void MX_I2C1_Init(void)
   /* USER CODE BEGIN I2C1_Init 2 */
 
   /* USER CODE END I2C1_Init 2 */
-
 }
 
 /**
-  * @brief TIM1 Initialization Function
-  * @param None
-  * @retval None
-  */
+ * @brief TIM1 Initialization Function
+ * @param None
+ * @retval None
+ */
 static void MX_TIM1_Init(void)
 {
 
@@ -303,14 +405,13 @@ static void MX_TIM1_Init(void)
   /* USER CODE BEGIN TIM1_Init 2 */
 
   /* USER CODE END TIM1_Init 2 */
-
 }
 
 /**
-  * @brief TIM2 Initialization Function
-  * @param None
-  * @retval None
-  */
+ * @brief TIM2 Initialization Function
+ * @param None
+ * @retval None
+ */
 static void MX_TIM2_Init(void)
 {
 
@@ -348,14 +449,45 @@ static void MX_TIM2_Init(void)
   /* USER CODE BEGIN TIM2_Init 2 */
 
   /* USER CODE END TIM2_Init 2 */
-
 }
 
 /**
-  * @brief USART2 Initialization Function
-  * @param None
-  * @retval None
-  */
+ * @brief USART1 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 115200;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
+}
+
+/**
+ * @brief USART2 Initialization Function
+ * @param None
+ * @retval None
+ */
 static void MX_USART2_UART_Init(void)
 {
 
@@ -381,14 +513,13 @@ static void MX_USART2_UART_Init(void)
   /* USER CODE BEGIN USART2_Init 2 */
 
   /* USER CODE END USART2_Init 2 */
-
 }
 
 /**
-  * @brief GPIO Initialization Function
-  * @param None
-  * @retval None
-  */
+ * @brief GPIO Initialization Function
+ * @param None
+ * @retval None
+ */
 static void MX_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
@@ -404,6 +535,9 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_10, GPIO_PIN_SET);
 
   /*Configure GPIO pin : PC13 */
   GPIO_InitStruct.Pin = GPIO_PIN_13;
@@ -424,6 +558,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : PC10 PC12 */
+  GPIO_InitStruct.Pin = GPIO_PIN_10 | GPIO_PIN_12;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
@@ -438,9 +579,9 @@ static void MX_GPIO_Init(void)
 /* USER CODE END 4 */
 
 /**
-  * @brief  This function is executed in case of error occurrence.
-  * @retval None
-  */
+ * @brief  This function is executed in case of error occurrence.
+ * @retval None
+ */
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
@@ -453,12 +594,12 @@ void Error_Handler(void)
 }
 #ifdef USE_FULL_ASSERT
 /**
-  * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
+ * @brief  Reports the name of the source file and the source line number
+ *         where the assert_param error has occurred.
+ * @param  file: pointer to the source file name
+ * @param  line: assert_param error line source number
+ * @retval None
+ */
 void assert_failed(uint8_t *file, uint32_t line)
 {
   /* USER CODE BEGIN 6 */
